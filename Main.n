@@ -20,62 +20,62 @@ module Program
                                 _ = Console.ReadKey() } else
         def src = FileInfo(Attr[0])
         match (src.Exists)
-            | false =>
-                Console.WriteLine("No such file")
+         | false =>
+            Console.WriteLine("No such file")
+            _ = Console.ReadKey()
+         | true when (!src.Extension.Equals(".dll")) =>
+            Console.WriteLine("File is not dll")
+            _ = Console.ReadKey()
+         | true =>
+            def str = using (reader 
+                    = StreamReader($@"$(Application.StartupPath)\Params.set"))
+                    reader.ReadToEnd()
+            def asm = str.Substring(str.IndexOf("ilasmasm=") 
+                + 10, str.IndexOf("\r\n", ((str.IndexOf("ilasmasm=") + 10) : int)) 
+                - (str.IndexOf("ilasmasm=") + 10))
+            def dasm = str.Substring(str.IndexOf("ildasmasm=") 
+                + 11, str.IndexOf("\r\n", ((str.IndexOf("ildasmasm=") + 11) : int)) 
+                - (str.IndexOf("ildasmasm=") + 11));
+            match (File.Exists(asm))
+             | false =>
+                Console.WriteLine($"No asm at $asm")
                 _ = Console.ReadKey()
-            | true when (!src.Extension.Equals(".dll")) =>
-                Console.WriteLine("File is not dll")
+             | true when (!File.Exists(dasm)) =>
+                Console.WriteLine($"No disasm at $dasm")
                 _ = Console.ReadKey()
-            | true =>
-                def str = using (reader 
-                        = StreamReader($@"$(Application.StartupPath)\Params.set"))
-                        reader.ReadToEnd()
-                def asm = str.Substring(str.IndexOf("ilasmasm=") 
-                    + 10, str.IndexOf("\r\n", ((str.IndexOf("ilasmasm=") + 10) : int)) 
-                    - (str.IndexOf("ilasmasm=") + 10))
-                def dasm = str.Substring(str.IndexOf("ildasmasm=") 
-                    + 11, str.IndexOf("\r\n", ((str.IndexOf("ildasmasm=") + 11) : int)) 
-                    - (str.IndexOf("ildasmasm=") + 11));
-                match (File.Exists(asm))
-                    | false =>
-                        Console.WriteLine($"No asm at $asm")
-                        _ = Console.ReadKey()
-                    | true when (!File.Exists(dasm)) =>
-                        Console.WriteLine($"No disasm at $dasm")
-                        _ = Console.ReadKey()
-                    | true =>
-                        def fn = src.FullName
-                        def fullName = fn.Substring(0, fn.LastIndexOf(".")) + ".il"
-                        def arguments = " /utf8 /OUT=\"" + fullName + "\" \"" + src.FullName + "\""
-                        def process = Process() <- { StartInfo = ProcessStartInfo(dasm, arguments) }
-                        _ = process.Start()
-                        process.WaitForExit()
-                        mutable builder = using(reader2 = StreamReader(fullName))
-                                (StringBuilder(reader2.ReadToEnd())).Replace(
-                                ".corflags 0x00000001", ".corflags 0x00000002")
-                        mutable num = 0
-                        for (mutable i = builder.ToString().IndexOf("System.Reflection.ObfuscationAttribute", 0);
-                                i != -1;
-                                i = builder.ToString().IndexOf("System.Reflection.ObfuscationAttribute", i))
-                            num++
-                            i = builder.ToString().IndexOf("// llExport\r\n", i) + 13
-                            builder = builder.Insert(i, "    .export[" + num + "]\r\n")
-                        def bytes = Encoding.UTF8.GetBytes(builder.ToString())
-                        using (def stream = FileStream(fullName, FileMode.Create))
-                            stream.WriteByte(0xef)
-                            stream.WriteByte(0xbb)
-                            stream.WriteByte(0xbf)
-                            stream.Write(bytes, 0, bytes.Length)
-                        def process2 = Process() <- { 
-                            StartInfo = ProcessStartInfo(asm
-                                , " /DLL /OPTIMIZE /REsrc=\"" 
-                                    + fullName.Substring(0, fullName.LastIndexOf(".")) 
-                                    + ".res\" \"" 
-                                    + fullName + "\"") }
-                        _ = process2.Start()
-                        process2.WaitForExit()
-                        File.Delete(fullName)
-                        File.Delete(fullName.Substring(0, fullName.LastIndexOf(".")) + ".res")
-                        def files = DirectoryInfo(src.DirectoryName).GetFiles("*.resrcs")
-                        foreach (src3 in files)
-                            File.Delete(src3.FullName)
+             | true =>
+                def fn = src.FullName
+                def fullName = fn.Substring(0, fn.LastIndexOf(".")) + ".il"
+                def arguments = " /utf8 /OUT=\"" + fullName + "\" \"" + src.FullName + "\""
+                def process = Process() <- { StartInfo = ProcessStartInfo(dasm, arguments) }
+                _ = process.Start()
+                process.WaitForExit()
+                mutable builder = using(reader2 = StreamReader(fullName))
+                        (StringBuilder(reader2.ReadToEnd())).Replace(
+                        ".corflags 0x00000001", ".corflags 0x00000002")
+                mutable num = 0
+                for (mutable i = builder.ToString().IndexOf("System.Reflection.ObfuscationAttribute", 0);
+                        i != -1;
+                        i = builder.ToString().IndexOf("System.Reflection.ObfuscationAttribute", i))
+                    num++
+                    i = builder.ToString().IndexOf("// llExport\r\n", i) + 13
+                    builder = builder.Insert(i, "    .export[" + num + "]\r\n")
+                def bytes = Encoding.UTF8.GetBytes(builder.ToString())
+                using (def stream = FileStream(fullName, FileMode.Create))
+                    stream.WriteByte(0xef)
+                    stream.WriteByte(0xbb)
+                    stream.WriteByte(0xbf)
+                    stream.Write(bytes, 0, bytes.Length)
+                def process2 = Process() <- { 
+                    StartInfo = ProcessStartInfo(asm
+                        , " /DLL /OPTIMIZE /REsrc=\"" 
+                            + fullName.Substring(0, fullName.LastIndexOf(".")) 
+                            + ".res\" \"" 
+                            + fullName + "\"") }
+                _ = process2.Start()
+                process2.WaitForExit()
+                File.Delete(fullName)
+                File.Delete(fullName.Substring(0, fullName.LastIndexOf(".")) + ".res")
+                def files = DirectoryInfo(src.DirectoryName).GetFiles("*.resrcs")
+                foreach (src3 in files)
+                    File.Delete(src3.FullName)
