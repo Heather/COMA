@@ -1,0 +1,7 @@
+/build
+/bin
+/obj
+
+packages/*
+!packages/NuGet
+!packages/repositories.conig
